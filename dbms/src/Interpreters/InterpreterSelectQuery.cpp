@@ -682,10 +682,10 @@ QueryProcessingStage::Enum InterpreterSelectQuery::executeFetchColumns(Pipeline 
         if (pipeline.streams.empty())
         {
             Block sample_block;
-            if (const StorageMergeTree * merge_tree = dynamic_cast<const StorageMergeTree *>(storage.get()))
-                sample_block = merge_tree->getSampleBlock(required_columns, context, query.prewhere_expression);
-            else if (const StorageReplicatedMergeTree * merge_tree = dynamic_cast<const StorageReplicatedMergeTree *>(storage.get()))
-                sample_block = merge_tree->getSampleBlock(required_columns, context, query.prewhere_expression);
+            if (const auto * merge_tree = dynamic_cast<const StorageMergeTree *>(storage.get()))
+                sample_block = merge_tree->getSampleBlockWithPrewhere(required_columns, context, query.prewhere_expression);
+            else if (const auto * merge_tree = dynamic_cast<const StorageReplicatedMergeTree *>(storage.get()))
+                sample_block = merge_tree->getSampleBlockWithPrewhere(required_columns, context, query.prewhere_expression);
             else
                 storage->getSampleBlockForColumns(required_columns);
 
