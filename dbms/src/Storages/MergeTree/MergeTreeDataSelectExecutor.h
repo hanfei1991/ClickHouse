@@ -31,6 +31,9 @@ public:
         unsigned num_streams,
         Int64 max_block_number_to_read) const;
 
+    /// Sample block we will get after reading column_names and applying prewhere_expression.
+    Block getSampleBlock(const Names & column_names, const Context & context, const ASTPtr & prewhere_expression) const;
+
 private:
     MergeTreeData & data;
 

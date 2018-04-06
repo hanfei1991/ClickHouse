@@ -84,6 +84,11 @@ public:
 
     String getDataPath() const override { return full_path; }
 
+    Block getSampleBlock(const Names & column_names, const Context & context, const ASTPtr & prewhere_expression) const
+    {
+        return reader.getSampleBlock(column_names, context, prewhere_expression);
+    }
+
 private:
     String path;
     String database_name;

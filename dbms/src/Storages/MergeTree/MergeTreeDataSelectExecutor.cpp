@@ -948,4 +948,31 @@ MarkRanges MergeTreeDataSelectExecutor::markRangesFromPKRange(
     return res;
 }
 
+
+Block MergeTreeDataSelectExecutor::getSampleBlock(const Names & column_names, const Context & context,
+                                                  const ASTPtr & prewhere_expression) const
+{
+    Block block =  data.getSampleBlockForColumns(column_names);
+
+    ExpressionActionsPtr prewhere_actions;
+    String prewhere_column;
+    if (prewhere_expression)
+    {
+        NamesAndTypesList available_real_columns = data.getColumns().getAllPhysical();
+        ExpressionAnalyzer analyzer(prewhere_expression, context, nullptr, available_real_columns);
+        prewhere_actions = analyzer.getActions(false);
+        prewhere_column = prewhere_expression->getColumnName();
+
+        auto required_pre_column_names = prewhere_actions->getRequiredColumns();
+        bool remove_prewhere_column = std::find(required_pre_column_names.begin(), required_pre_column_names.end(),
+                                                prewhere_column) == required_pre_column_names.end();
+
+        prewhere_actions->execute(block);
+        if (remove_prewhere_column)
+            block.erase(prewhere_column);
+    }
+
+    return std::move(block);
+}
+
 }
