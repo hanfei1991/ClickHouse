@@ -55,10 +55,13 @@ Block InterpreterShowCreateQuery::getSampleBlock()
 QueryPipeline InterpreterShowCreateQuery::executeImpl()
 {
     ASTPtr create_query;
-    ASTQueryWithTableAndOutput * show_query = nullptr;
-    if ((show_query = query_ptr->as<ASTShowCreateTableQuery>()) ||
-        (show_query = query_ptr->as<ASTShowCreateViewQuery>()) ||
-        (show_query = query_ptr->as<ASTShowCreateDictionaryQuery>()))
+    ASTQueryWithTableAndOutput * show_query = query_ptr->as<ASTShowCreateTableQuery>();
+    if (!show_query)
+        show_query = query_ptr->as<ASTShowCreateViewQuery>();
+    if (!show_query)
+        show_query = query_ptr->as<ASTShowCreateDictionaryQuery>();
+
+    if (show_query)
     {
         /// Only `SHOW CREATE TABLE` should resolve temporary tables for an unqualified name —
         /// `VIEW` and `DICTIONARY` cannot refer to a temporary table, so resolving to one would
@@ -167,7 +170,7 @@ QueryPipeline InterpreterShowCreateQuery::executeImpl()
             && ast_create_query.storage->engine->name == "Alias")
         {
             auto table = DatabaseCatalog::instance().tryGetTable(table_id, getContext());
-            StorageAlias::checkTargetGrantedIfAlias(table, getContext(), AccessType::SHOW_COLUMNS);
+            StorageAlias::checkDeclaredTargetGrantedIfAlias(table, getContext(), AccessType::SHOW_COLUMNS);
         }
 
         if (query_ptr->as<ASTShowCreateViewQuery>())
@@ -183,7 +186,7 @@ QueryPipeline InterpreterShowCreateQuery::executeImpl()
                     backQuote(ast_create_query.getDatabase()), backQuote(ast_create_query.getTable()));
         }
     }
-    else if ((show_query = query_ptr->as<ASTShowCreateDatabaseQuery>()))
+    else if (show_query = query_ptr->as<ASTShowCreateDatabaseQuery>(); show_query)
     {
         if (show_query->isTemporary())
             throw Exception(ErrorCodes::SYNTAX_ERROR, "Temporary databases are not possible.");

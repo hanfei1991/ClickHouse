@@ -27,28 +27,56 @@ public:
 
     std::string getName() const override { return "Alias"; }
 
-    bool isMergeTree() const override
-    {
-        auto target = tryGetTargetTable();
-        return target && target->isMergeTree();
-    }
+    bool isMergeTree() const override;
 
     bool readsFromOtherTables() const override { return true; }
+    std::vector<StoragePtr> getUnderlyingStorages() const override
+    {
+        if (auto target = tryGetTargetTable())
+            return {target};
+        return {};
+    }
+
+    /// An `Alias` has no data of its own, so a bulk `TRUNCATE ALL TABLES` must skip it.
+    /// Only the bulk paths consult this; an explicit `TRUNCATE TABLE <alias>` still truncates the target.
+    bool supportsTruncate() const override { return false; }
+
+    /// The alias holds no metadata of its own, so the answer is the target's. Without this a
+    /// unique-key table read through an alias would look unconstrained to the planner.
+    bool hasUniqueKey() const override
+    {
+        auto target = tryGetTargetTable();
+        return target && target->hasUniqueKey();
+    }
 
     /// Get the target storage this alias points to
     StoragePtr getTargetTable(std::optional<TargetAccess> access_check = std::nullopt) const;
     StoragePtr tryGetTargetTable() const { return DatabaseCatalog::instance().tryGetTable(StorageID(target_database, target_table), getContext()); }
 
-    /// Returns whether the current user has the specified access to the target table or column.
+    /// Returns whether the current user has the specified access to every table this alias resolves
+    /// through, i.e. the whole chain when the target is itself an Alias. For callers that read metadata.
     /// An empty `column_name` represents table-level access.
     bool isTargetTableGranted(ContextPtr query_context, AccessType access_type, const String & column_name) const;
 
-    /// If `storage` is an `Alias`, throw `ACCESS_DENIED` unless the current user holds `access_type`
-    /// on the alias's target (table-level when `column_name` is empty); a no-op for any other storage.
-    /// Metadata paths that forward the target's schema (`DESCRIBE`, `SHOW CREATE`, `system` tables,
-    /// `COM_FIELD_LIST`, table functions, ...) must call this, because the `Alias` publishes its
-    /// target's metadata before any row is read; data paths are already gated inside `getTargetTable`.
+    /// Same, for the target named in this alias's own definition only. For callers that expose that
+    /// definition and resolve nothing through it.
+    bool isDeclaredTargetGranted(ContextPtr query_context, AccessType access_type, const String & column_name) const;
+
+    /// Returns the subset of `column_names` the current user has this access to on every table this
+    /// alias resolves through. Resolves the chain once, whatever the grants look like.
+    NameSet filterColumnsGrantedThroughChain(ContextPtr query_context, AccessType access_type, const Names & column_names) const;
+
+    /// If `storage` is an `Alias`, throw `ACCESS_DENIED` unless the current user holds `access_type` on
+    /// every table the alias resolves through (table-level when `column_name` is empty); a no-op for any
+    /// other storage. Metadata paths that forward the resolved target's schema (`DESCRIBE`,
+    /// `COM_FIELD_LIST`, `hasColumnInTable`, table functions, ...) must call this, because the `Alias`
+    /// publishes that metadata before any row is read; data paths are gated inside `getTargetTable`.
     static void checkTargetGrantedIfAlias(
+        const StoragePtr & storage, ContextPtr query_context, AccessType access_type, const String & column_name = {});
+
+    /// Same, but checks only the target named in this alias's own definition (see `isDeclaredTargetGranted`).
+    /// For callers that expose that definition and resolve nothing through it, such as `SHOW CREATE`.
+    static void checkDeclaredTargetGrantedIfAlias(
         const StoragePtr & storage, ContextPtr query_context, AccessType access_type, const String & column_name = {});
 
     /// Read from target table
@@ -183,6 +211,7 @@ public:
     bool prefersLargeBlocks() const override { return getTargetTable()->prefersLargeBlocks(); }
     bool areAsynchronousInsertsEnabled() const override { return getTargetTable()->areAsynchronousInsertsEnabled(); }
     bool isRemote() const override { return getTargetTable()->isRemote(); }
+    bool readRequiresAnalyzedQuery() const override { return getTargetTable()->readRequiresAnalyzedQuery(); }
     bool isSharedStorage() const override { return getTargetTable()->isSharedStorage(); }
     bool supportsReplication() const override
     {
