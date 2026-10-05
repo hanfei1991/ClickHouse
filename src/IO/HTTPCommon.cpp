@@ -149,12 +149,10 @@ Exception HTTPException::makeExceptionMessage(
     std::string masked_uri = uri;
     maskURICredentials(masked_uri);
 
-    /// The response body is remote content that can reflect the request back: its URL (masked here for
-    /// presigned parameters) and the request's own credentials, which a server may echo verbatim (e.g.
-    /// an auth error naming the user). Scrub those exact credential strings, keeping the rest of the
-    /// body - a useful diagnostic that does not carry a credential.
+    /// The response body is remote content that can reflect the request's own credentials back, which
+    /// a server may echo verbatim (e.g. an auth error naming the user). Scrub those exact credential
+    /// strings, keeping the rest of the body - a useful diagnostic that does not carry a credential.
     std::string masked_body = body;
-    maskPresignedURLParameters(masked_body);
     for (const auto & secret : body_secrets)
         if (!secret.empty())
             boost::replace_all(masked_body, secret, "[HIDDEN]");
