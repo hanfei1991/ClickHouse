@@ -61,7 +61,10 @@ static void fillDataImpl(MutableColumns & res_columns, SchemaCache & schema_cach
     {
         res_columns[0]->insert(storage_name);
         String source = key.source;
-        maskURICredentials(source);
+        /// Only a URL can carry a credential. A `File` key is a local path, where the presigned
+        /// parameter scan would rewrite a '?' in a file name and swallow everything after it.
+        if (findURIAuthority(source) != String::npos)
+            maskURICredentials(source);
         res_columns[1]->insert(source);
         res_columns[2]->insert(key.format);
         res_columns[3]->insert(key.additional_format_info);
