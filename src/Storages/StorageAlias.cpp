@@ -34,6 +34,7 @@ namespace ErrorCodes
     extern const int NUMBER_OF_ARGUMENTS_DOESNT_MATCH;
     extern const int BAD_ARGUMENTS;
     extern const int NOT_IMPLEMENTED;
+    extern const int ACCESS_DENIED;
 }
 
 StorageAlias::StorageAlias(
@@ -71,6 +72,17 @@ bool StorageAlias::isTargetTableGranted(ContextPtr query_context, AccessType acc
         return access->isGranted(access_type, target_database, target_table);
 
     return access->isGranted(access_type, target_database, target_table, column_name);
+}
+
+void StorageAlias::checkTargetGrantedIfAlias(
+    const StoragePtr & storage, ContextPtr query_context, AccessType access_type, const String & column_name)
+{
+    const auto * alias = storage ? storage->as<StorageAlias>() : nullptr;
+    if (alias && !alias->isTargetTableGranted(query_context, access_type, column_name))
+        throw Exception(
+            ErrorCodes::ACCESS_DENIED,
+            "Not enough privileges to access the table that {} points to",
+            storage->getStorageID().getNameForLogs());
 }
 
 /// AliasSink: Writes data to the target table using full INSERT pipeline

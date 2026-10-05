@@ -43,6 +43,14 @@ public:
     /// An empty `column_name` represents table-level access.
     bool isTargetTableGranted(ContextPtr query_context, AccessType access_type, const String & column_name) const;
 
+    /// If `storage` is an `Alias`, throw `ACCESS_DENIED` unless the current user holds `access_type`
+    /// on the alias's target (table-level when `column_name` is empty); a no-op for any other storage.
+    /// Metadata paths that forward the target's schema (`DESCRIBE`, `SHOW CREATE`, `system` tables,
+    /// `COM_FIELD_LIST`, table functions, ...) must call this, because the `Alias` publishes its
+    /// target's metadata before any row is read; data paths are already gated inside `getTargetTable`.
+    static void checkTargetGrantedIfAlias(
+        const StoragePtr & storage, ContextPtr query_context, AccessType access_type, const String & column_name = {});
+
     /// Read from target table
     void read(
         QueryPlan & query_plan,

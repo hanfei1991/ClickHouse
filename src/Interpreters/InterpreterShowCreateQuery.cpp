@@ -29,7 +29,6 @@ namespace Setting
 
 namespace ErrorCodes
 {
-    extern const int ACCESS_DENIED;
     extern const int SYNTAX_ERROR;
     extern const int THERE_IS_NO_QUERY;
     extern const int BAD_ARGUMENTS;
@@ -168,9 +167,7 @@ QueryPipeline InterpreterShowCreateQuery::executeImpl()
             && ast_create_query.storage->engine->name == "Alias")
         {
             auto table = DatabaseCatalog::instance().tryGetTable(table_id, getContext());
-            if (const auto * alias = table ? table->as<StorageAlias>() : nullptr;
-                alias && !alias->isTargetTableGranted(getContext(), AccessType::SHOW_COLUMNS, {}))
-                throw Exception(ErrorCodes::ACCESS_DENIED, "Not enough privileges to show metadata exposed by {}", table_id.getNameForLogs());
+            StorageAlias::checkTargetGrantedIfAlias(table, getContext(), AccessType::SHOW_COLUMNS);
         }
 
         if (query_ptr->as<ASTShowCreateViewQuery>())
