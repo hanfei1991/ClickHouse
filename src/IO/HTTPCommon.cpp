@@ -2,7 +2,6 @@
 
 #include <Server/HTTP/HTTPServerResponse.h>
 #include <Poco/StreamCopier.h>
-#include <Poco/Net/HTTPBasicCredentials.h>
 #include <Common/Exception.h>
 #include <Common/maskURIPassword.h>
 
@@ -106,19 +105,6 @@ Strings requestCredentialSecrets(const Poco::Net::HTTPRequest & request)
     static constexpr std::string_view BEARER = "Bearer ";
     if (authorization.starts_with(BEARER))
         return {authorization.substr(BEARER.length())};
-
-    static constexpr std::string_view BASIC = "Basic ";
-    if (authorization.starts_with(BASIC))
-    {
-        /// `HTTPBasicCredentials` decodes the base64 user name and password from the header.
-        Poco::Net::HTTPBasicCredentials credentials(request);
-        Strings secrets;
-        if (!credentials.getUsername().empty())
-            secrets.push_back(credentials.getUsername());
-        if (!credentials.getPassword().empty())
-            secrets.push_back(credentials.getPassword());
-        return secrets;
-    }
 
     return {};
 }
