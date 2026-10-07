@@ -98,6 +98,9 @@ std::istream * receiveResponse(
 
 Strings requestCredentialSecrets(const Poco::Net::HTTPRequest & request)
 {
+    if (!request.has("Authorization"))
+        return {};
+
     /// `getCredentials` splits the scheme off the header value the way an HTTP peer does: the scheme
     /// is matched case-insensitively, and a field value may begin with whitespace (RFC 9110, 5.5),
     /// which `auth_header = 'Authorization: Bearer <token>'` leaves in front of the scheme.
