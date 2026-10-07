@@ -98,13 +98,20 @@ std::istream * receiveResponse(
 
 Strings requestCredentialSecrets(const Poco::Net::HTTPRequest & request)
 {
-    if (!request.has("Authorization"))
-        return {};
-
-    const std::string & authorization = request.get("Authorization");
-    static constexpr std::string_view BEARER = "Bearer ";
-    if (authorization.starts_with(BEARER))
-        return {authorization.substr(BEARER.length())};
+    /// `getCredentials` splits the scheme off the header value the way an HTTP peer does: the scheme
+    /// is matched case-insensitively, and a field value may begin with whitespace (RFC 9110, 5.5),
+    /// which `auth_header = 'Authorization: Bearer <token>'` leaves in front of the scheme.
+    std::string scheme;
+    std::string auth_info;
+    request.getCredentials(scheme, auth_info);
+    Poco::trimInPlace(auth_info);
+    /// Only a bearer token is recoverable from the header, and it is a secret as a whole. A `Basic`
+    /// header holds base64 of `user:password` and is deliberately not decoded here: its value is
+    /// user input whenever it came from `headers()`, decoding throws on anything outside the base64
+    /// alphabet, and the user name of a pair is an identifier rather than a credential. A caller
+    /// that authenticated the request itself adds the plain text it holds.
+    if (Poco::icompare(scheme, "Bearer") == 0 && !auth_info.empty())
+        return {auth_info};
 
     return {};
 }
