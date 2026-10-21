@@ -10512,9 +10512,20 @@ static Field convertPartitionFieldToType(const Field & value, const DataTypePtr 
 
     FormatSettings format_settings;
     format_settings.date_time_overflow_behavior = FormatSettings::DateTimeOverflowBehavior::Throw;
-    Field converted = convertFieldToTypeOrThrow(value, *type, nullptr, format_settings);
 
     const String & literal = value.safeGet<String>();
+
+    Field value_to_convert = value;
+    if (which.isDateOrDate32())
+    {
+        LocalDate date;
+        ReadBufferFromString date_in(literal);
+        readDateText(date, date_in);
+        value_to_convert = Field(literal.substr(0, date_in.count()));
+    }
+
+    Field converted = convertFieldToTypeOrThrow(value_to_convert, *type, nullptr, format_settings);
+
     auto column = nested_type->createColumn();
     column->insert(converted);
     WriteBufferFromOwnString parsed_text;
